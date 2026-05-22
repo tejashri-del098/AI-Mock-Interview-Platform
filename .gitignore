@@ -1,0 +1,19 @@
+# Environments
+env/
+venv/
+ENV/
+
+# Secrets
+.env
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local Database & Dynamic Audio Assets
+data/
+
+# macOS files
+.DS_Store
