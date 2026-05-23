@@ -31,6 +31,10 @@ COPY requirements.txt /app/
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
+# Create necessary runtime directories and ensure correct ownership (run as root)
+RUN mkdir -p /app/data/uploads /app/data/audio /app/data/reports /app/data/chromadb && \
+    chown -R user:user /app
+
 # Switch to non-root user
 USER user
 
@@ -40,9 +44,6 @@ RUN python -c "from langchain_community.embeddings import HuggingFaceEmbeddings;
 
 # Copy the rest of the application files with user ownership
 COPY --chown=user:user . /app
-
-# Create necessary runtime directories and ensure they are writable
-RUN mkdir -p /app/data/uploads /app/data/audio /app/data/reports /app/data/chromadb
 
 # Expose the public port expected by Hugging Face Spaces
 EXPOSE 7860
