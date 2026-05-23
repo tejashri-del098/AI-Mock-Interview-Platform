@@ -10,6 +10,8 @@ pinned: false
 
 # AI Mock Interview Platform
 
+[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/tejashrichoudhary2/AI-Mock-Interview-Platform)
+
 A state-of-the-art, privacy-centric, local RAG-powered, and speech-enabled technical recruiter preparation platform. This application parses a candidate's resume (PDF, DOCX, or TXT), embeds and indexes it in a local vector database, conducts an interactive technical mock interview with natural text-to-speech voice generation and local Whisper speech-to-text recognition, and compiles a comprehensive performance dashboard complete with interactive score charts, ideal responses, and a downloadable PDF certificate report.
 
 ---
@@ -25,7 +27,9 @@ This project solves these issues by establishing a **RAG-powered conversational 
 
 ---
 
-## 🎥 Demo Video Link
+## 🎥 Demo Video & Deployed Link
+🚀 **[Live Deployed Space on Hugging Face](https://huggingface.co/spaces/tejashrichoudhary2/AI-Mock-Interview-Platform)**
+
 📺 **[Watch the Live Demo Video on YouTube/Google Drive](https://www.youtube.com/)** *(Replace this link with your actual demo url)*
 
 ---
