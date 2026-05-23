@@ -21,5 +21,10 @@ jobs:
           HF_SPACE_NAME: ${{ secrets.HF_SPACE_NAME }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+          git checkout -b deploy-branch
+          git rm -rf assets/
+          git commit -m "chore: remove binary assets for Hugging Face Spaces"
           git remote add hf https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/$HF_USERNAME/$HF_SPACE_NAME
-          git push --force hf main
+          git push --force hf deploy-branch:main
