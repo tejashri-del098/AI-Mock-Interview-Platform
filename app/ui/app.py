@@ -7,6 +7,7 @@ import streamlit.components.v1 as components
 
 # API Server Configuration
 BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
+BACKEND_URL_CLIENT = os.getenv("BACKEND_URL_CLIENT", BACKEND_URL)
 
 # Page configuration with premium title and layout
 st.set_page_config(
@@ -64,7 +65,10 @@ st.markdown("""
 # Helper function to autoplay audio in the browser
 def autoplay_audio(audio_url: str):
     """Embed an HTML audio element to automatically play question text-to-speech."""
-    full_url = f"{BACKEND_URL}{audio_url}"
+    if BACKEND_URL_CLIENT.startswith("/"):
+        full_url = audio_url
+    else:
+        full_url = f"{BACKEND_URL_CLIENT}{audio_url}"
     audio_html = f"""
     <audio autoplay style="display:none;">
         <source src="{full_url}" type="audio/mp3">
@@ -81,7 +85,7 @@ voice_recorder = components.declare_component(
 def voice_recorder_component(key: str):
     """Renders a browser-based audio recorder that uploads recorded clips directly to FastAPI and returns transcribed text."""
     # It returns the transcribed text string (or None if no transcription has run yet).
-    val = voice_recorder(backend_url=BACKEND_URL, key=key)
+    val = voice_recorder(backend_url=BACKEND_URL_CLIENT, key=key)
     return val
 
 # Initialize Streamlit session states
@@ -447,7 +451,10 @@ elif st.session_state.interview_completed:
         with right_col:
             st.markdown("### 📄 Export Results")
             # PDF Report download
-            pdf_url = f"{BACKEND_URL}{report['pdf_url']}"
+            if BACKEND_URL_CLIENT.startswith("/"):
+                pdf_url = report['pdf_url']
+            else:
+                pdf_url = f"{BACKEND_URL_CLIENT}{report['pdf_url']}"
             st.markdown(f"""
             <a href="{pdf_url}" target="_blank" style="text-decoration:none;">
                 <button style="width:100%; padding:12px; background-color:#6366F1; color:white; font-weight:bold; border:none; border-radius:6px; cursor:pointer;">
