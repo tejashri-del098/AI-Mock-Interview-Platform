@@ -52,51 +52,76 @@ class LLMClient:
             
         start_time = time.time()
         response_text = ""
+        actual_provider = provider
         
-        if provider == "gemini":
-            import google.generativeai as genai
-            # Use gemini-1.5-flash as default fast model for free tier
-            model_name = "gemini-1.5-flash"
-            
-            # Combine system prompt with main prompt if provided
-            full_prompt = prompt
-            if system_prompt:
-                # In Gemini 1.5 we can pass system_instruction to GenerativeModel
-                model = genai.GenerativeModel(
-                    model_name=model_name,
-                    system_instruction=system_prompt,
-                    generation_config=genai.types.GenerationConfig(
-                        temperature=temperature,
-                        max_output_tokens=max_tokens
+        try:
+            if provider == "gemini":
+                import google.generativeai as genai
+                # Use gemini-2.5-flash as default fast model for free tier
+                model_name = "gemini-2.5-flash"
+                
+                # Combine system prompt with main prompt if provided
+                full_prompt = prompt
+                if system_prompt:
+                    # In Gemini 1.5 we can pass system_instruction to GenerativeModel
+                    model = genai.GenerativeModel(
+                        model_name=model_name,
+                        system_instruction=system_prompt,
+                        generation_config=genai.types.GenerationConfig(
+                            temperature=temperature,
+                            max_output_tokens=max_tokens
+                        )
                     )
+                else:
+                    model = genai.GenerativeModel(
+                        model_name=model_name,
+                        generation_config=genai.types.GenerationConfig(
+                            temperature=temperature,
+                            max_output_tokens=max_tokens
+                        )
+                    )
+                
+                response = model.generate_content(full_prompt)
+                response_text = response.text
+                
+            elif provider == "groq":
+                # Use llama-3.3-70b-versatile as the standard fast conversational model
+                model_name = "llama-3.3-70b-versatile"
+                messages = []
+                if system_prompt:
+                    messages.append({"role": "system", "content": system_prompt})
+                messages.append({"role": "user", "content": prompt})
+                
+                chat_completion = self.groq_client.chat.completions.create(
+                    messages=messages,
+                    model=model_name,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
                 )
+                response_text = chat_completion.choices[0].message.content
+                
+        except Exception as primary_error:
+            # If Gemini fails and Groq is available, fall back automatically
+            if provider == "gemini" and self.groq_client:
+                print(f"Primary LLM (Gemini) failed: {str(primary_error)}. Falling back to Groq...")
+                try:
+                    actual_provider = "groq"
+                    model_name = "llama-3.3-70b-versatile"
+                    messages = []
+                    if system_prompt:
+                        messages.append({"role": "system", "content": system_prompt})
+                    messages.append({"role": "user", "content": prompt})
+                    chat_completion = self.groq_client.chat.completions.create(
+                        messages=messages,
+                        model=model_name,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                    )
+                    response_text = chat_completion.choices[0].message.content
+                except Exception as secondary_error:
+                    raise RuntimeError(f"Both primary and fallback LLM providers failed. Gemini: {str(primary_error)}. Groq: {str(secondary_error)}")
             else:
-                model = genai.GenerativeModel(
-                    model_name=model_name,
-                    generation_config=genai.types.GenerationConfig(
-                        temperature=temperature,
-                        max_output_tokens=max_tokens
-                    )
-                )
-            
-            response = model.generate_content(full_prompt)
-            response_text = response.text
-            
-        elif provider == "groq":
-            # Use llama3-8b-8192 as the standard fast conversational model
-            model_name = "llama3-8b-8192"
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": prompt})
-            
-            chat_completion = self.groq_client.chat.completions.create(
-                messages=messages,
-                model=model_name,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-            response_text = chat_completion.choices[0].message.content
+                raise primary_error
 
         latency = time.time() - start_time
         prompt_tokens = self.estimate_tokens(prompt) + (self.estimate_tokens(system_prompt) if system_prompt else 0)
@@ -105,7 +130,7 @@ class LLMClient:
         
         return {
             "text": response_text,
-            "provider": provider,
+            "provider": actual_provider,
             "latency": latency,
             "tokens": total_tokens
         }
@@ -139,7 +164,18 @@ class LLMClient:
                     text = text.strip("`").strip()
                 
                 # Parse JSON
-                parsed_data = json.loads(text)
+                try:
+                    parsed_data = json.loads(text)
+                except json.JSONDecodeError:
+                    # Fallback: isolate JSON by finding outermost curly braces
+                    start_idx = text.find('{')
+                    end_idx = text.rfind('}')
+                    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                        cleaned_json = text[start_idx:end_idx+1]
+                        parsed_data = json.loads(cleaned_json)
+                    else:
+                        raise
+                
                 return {
                     "data": parsed_data,
                     "provider": res["provider"],
@@ -149,7 +185,8 @@ class LLMClient:
             except (json.JSONDecodeError, Exception) as e:
                 if attempt == 2:
                     # Final attempt failed, raise exception
-                    raise ValueError(f"Failed to generate valid JSON after 3 attempts. Raw text: {res['text']}. Error: {str(e)}")
+                    raw_text_info = res["text"] if 'res' in locals() and isinstance(res, dict) and "text" in res else "N/A"
+                    raise ValueError(f"Failed to generate valid JSON after 3 attempts. Raw text: {raw_text_info}. Error: {str(e)}")
                 # Modify prompt slightly to reinforce format on retry
                 prompt += "\n\nRetrying: The previous output was invalid JSON. Please ensure your response contains ONLY the raw JSON object matching the requested schema."
                 time.sleep(0.5)

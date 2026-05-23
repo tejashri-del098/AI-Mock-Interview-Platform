@@ -72,105 +72,17 @@ def autoplay_audio(audio_url: str):
     """
     st.markdown(audio_html, unsafe_allow_html=True)
 
-# Custom HTML5 Voice Recorder component using Streamlit components.html
-def voice_recorder_component():
+# Declare the voice recorder component
+voice_recorder = components.declare_component(
+    "voice_recorder",
+    path=os.path.join(os.path.dirname(__file__), "voice_recorder")
+)
+
+def voice_recorder_component(key: str):
     """Renders a browser-based audio recorder that uploads recorded clips directly to FastAPI and returns transcribed text."""
-    
-    recorder_html = f"""
-    <div style="font-family: sans-serif; background-color: #1E293B; border: 1px solid #334155; border-radius: 8px; padding: 15px; text-align: center; color: #F8FAFC;">
-        <div style="font-size: 0.95rem; font-weight: bold; margin-bottom: 10px;">🎤 Record Your Answer</div>
-        <div style="margin-bottom: 12px;">
-            <button id="recordBtn" style="background-color: #EF4444; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-right: 8px; transition: background-color 0.2s;">
-                🔴 Record
-            </button>
-            <button id="stopBtn" disabled style="background-color: #64748B; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold; cursor: not-allowed; transition: background-color 0.2s;">
-                ⏹️ Stop
-            </button>
-        </div>
-        <div id="status" style="font-size: 0.85rem; color: #94A3B8;">Click 'Record' and speak into your microphone.</div>
-    </div>
-
-    <script>
-        let mediaRecorder;
-        let audioChunks = [];
-        const recordBtn = document.getElementById('recordBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const statusDiv = document.getElementById('status');
-
-        recordBtn.addEventListener('click', async () => {{
-            audioChunks = [];
-            try {{
-                const stream = await navigator.mediaDevices.getUserMedia({{ audio: true }});
-                mediaRecorder = new MediaRecorder(stream, {{ mimeType: 'audio/webm' }});
-                
-                mediaRecorder.ondataavailable = (event) => {{
-                    audioChunks.push(event.data);
-                }};
-
-                mediaRecorder.onstop = async () => {{
-                    const audioBlob = new Blob(audioChunks, {{ type: 'audio/webm' }});
-                    statusDiv.innerText = "Processing speech... transcribing audio...";
-                    
-                    // Upload to FastAPI process-audio endpoint
-                    const formData = new FormData();
-                    formData.append("file", audioBlob, "recording.webm");
-
-                    try {{
-                        const response = await fetch('{BACKEND_URL}/process-audio', {{
-                            method: 'POST',
-                            body: formData
-                        }});
-                        
-                        const result = await response.json();
-                        if (result.text) {{
-                            statusDiv.innerText = "Transcribed successfully!";
-                            // Send transcribed text back to Streamlit
-                            window.parent.postMessage({{
-                                type: 'streamlit:setComponentValue',
-                                value: result.text
-                            }}, '*');
-                        }} else {{
-                            statusDiv.innerText = result.warning || "Could not transcribe audio. Please try again or type your answer.";
-                        }}
-                    }} catch (err) {{
-                        console.error("Upload error:", err);
-                        statusDiv.innerText = "Error contacting transcription server. Try typing your response.";
-                    }}
-                }};
-
-                mediaRecorder.start();
-                recordBtn.disabled = true;
-                recordBtn.style.backgroundColor = '#991B1B';
-                recordBtn.style.cursor = 'not-allowed';
-                stopBtn.disabled = false;
-                stopBtn.style.backgroundColor = '#475569';
-                stopBtn.style.cursor = 'pointer';
-                statusDiv.innerHTML = "🔴 Recording... Speak now. Click 'Stop' when finished.";
-                statusDiv.style.color = '#EF4444';
-            }} catch (err) {{
-                console.error("Mic permissions error:", err);
-                statusDiv.innerText = "Microphone access denied or not supported in this browser. Please type your response.";
-                statusDiv.style.color = '#EF4444';
-            }}
-        }});
-
-        stopBtn.addEventListener('click', () => {{
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {{
-                mediaRecorder.stop();
-                // Stop all tracks to release microphone
-                mediaRecorder.stream.getTracks().forEach(track => track.stop());
-                
-                recordBtn.disabled = false;
-                recordBtn.style.backgroundColor = '#EF4444';
-                recordBtn.style.cursor = 'pointer';
-                stopBtn.disabled = true;
-                stopBtn.style.backgroundColor = '#64748B';
-                stopBtn.style.cursor = 'not-allowed';
-            }}
-        }});
-    </script>
-    """
-    return components.html(recorder_html, height=140)
+    # It returns the transcribed text string (or None if no transcription has run yet).
+    val = voice_recorder(backend_url=BACKEND_URL, key=key)
+    return val
 
 # Initialize Streamlit session states
 if "session_id" not in st.session_state:
@@ -202,13 +114,18 @@ with st.sidebar:
     st.markdown("---")
     
     # 1. Resume Uploader Widget
-    uploaded_file = st.file_uploader("Upload your resume (PDF)", type=["pdf"])
+    uploaded_file = st.file_uploader("Upload your resume (PDF, DOCX, TXT)", type=["pdf", "docx", "txt", "md"])
     
     if uploaded_file is not None and st.session_state.session_id is None:
         with st.spinner("Uploading and indexing resume text..."):
             try:
                 # Post to /upload-resume
-                files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "application/pdf")}
+                mime_type = "application/pdf"
+                if uploaded_file.name.lower().endswith(".docx"):
+                    mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                elif uploaded_file.name.lower().endswith(".txt") or uploaded_file.name.lower().endswith(".md"):
+                    mime_type = "text/plain"
+                files = {"file": (uploaded_file.name, uploaded_file.getvalue(), mime_type)}
                 res = requests.post(f"{BACKEND_URL}/upload-resume", files=files)
                 
                 if res.status_code == 200:
@@ -233,9 +150,17 @@ with st.sidebar:
                             st.session_state.classified_role = profile["classified_role"]
                             st.success("Resume processed successfully!")
                         else:
-                            st.error("Failed to extract resume details.")
+                            try:
+                                err_detail = extract_res.json().get("detail", extract_res.text)
+                            except Exception:
+                                err_detail = extract_res.text
+                            st.error(f"Failed to extract resume details: {err_detail}")
                 else:
-                    st.error(f"Error parsing PDF: {res.json().get('detail', 'Unknown error')}")
+                    try:
+                        err_detail = res.json().get("detail", res.text)
+                    except Exception:
+                        err_detail = res.text
+                    st.error(f"Error parsing PDF: {err_detail}")
             except Exception as e:
                 st.error(f"Failed to connect to backend server: {str(e)}")
 
@@ -264,31 +189,42 @@ with st.sidebar:
         
         # 3. Start Interview Button
         if not st.session_state.interview_started:
-            if st.button("🚀 Start Interview", use_container_width=True):
-                with st.spinner("Generating first question..."):
-                    try:
-                        start_payload = {
-                            "session_id": st.session_state.session_id,
-                            "profile_id": st.session_state.profile_id,
-                            "role": selected_role,
-                            "difficulty": difficulty,
-                            "duration": duration
-                        }
-                        res = requests.post(f"{BACKEND_URL}/start-interview", json=start_payload)
-                        if res.status_code == 200:
-                            data = res.json()
-                            st.session_state.current_question = data["question"]
-                            st.session_state.current_audio_url = data["audio_url"]
-                            st.session_state.chat_history.append({
-                                "sender": "assistant",
-                                "message": data["question"]
-                            })
-                            st.session_state.interview_started = True
-                            st.rerun()
-                        else:
-                            st.error("Failed to start session.")
-                    except Exception as e:
-                        st.error(f"Error starting interview: {str(e)}")
+            if st.session_state.profile_id is None:
+                st.warning("⚠️ Resume analysis did not complete. Please reset and upload your resume again.")
+                if st.button("🔄 Reset & Try Again", use_container_width=True):
+                    for key in ["session_id", "profile_id", "chat_history", "skills", "projects", "interview_started", "interview_completed", "current_question", "current_audio_url", "evaluation"]:
+                        st.session_state[key] = None if key != "chat_history" and key != "skills" and key != "projects" else []
+                    st.rerun()
+            else:
+                if st.button("🚀 Start Interview", use_container_width=True):
+                    with st.spinner("Generating first question..."):
+                        try:
+                            start_payload = {
+                                "session_id": st.session_state.session_id,
+                                "profile_id": st.session_state.profile_id,
+                                "role": selected_role,
+                                "difficulty": difficulty,
+                                "duration": duration
+                            }
+                            res = requests.post(f"{BACKEND_URL}/start-interview", json=start_payload)
+                            if res.status_code == 200:
+                                data = res.json()
+                                st.session_state.current_question = data["question"]
+                                st.session_state.current_audio_url = data["audio_url"]
+                                st.session_state.chat_history.append({
+                                    "sender": "assistant",
+                                    "message": data["question"]
+                                })
+                                st.session_state.interview_started = True
+                                st.rerun()
+                            else:
+                                try:
+                                    err_detail = res.json().get("detail", res.text)
+                                except Exception:
+                                    err_detail = res.text
+                                st.error(f"Failed to start session: {err_detail}")
+                        except Exception as e:
+                            st.error(f"Error starting interview: {str(e)}")
                         
         else:
             # Active interview progress tracker
@@ -355,7 +291,8 @@ elif st.session_state.interview_started and not st.session_state.interview_compl
         st.session_state.current_audio_url = None
 
     # Audio recorder input
-    transcribed_text = voice_recorder_component()
+    num_asked = sum(1 for turn in st.session_state.chat_history if turn["sender"] == "assistant")
+    transcribed_text = voice_recorder_component(key=f"recorder_turn_{num_asked}")
     
     # Form for text submission and fallback review
     with st.form("response_form", clear_on_submit=True):
@@ -405,7 +342,11 @@ elif st.session_state.interview_started and not st.session_state.interview_compl
                                 
                             st.rerun()
                         else:
-                            st.error("Failed to generate next question.")
+                            try:
+                                err_detail = res.json().get("detail", res.text)
+                            except Exception:
+                                err_detail = res.text
+                            st.error(f"Failed to generate next question: {err_detail}")
                     except Exception as e:
                         st.error(f"Error communicating with backend: {str(e)}")
 
@@ -425,7 +366,11 @@ elif st.session_state.interview_completed:
                 if res.status_code == 200:
                     st.session_state.evaluation = res.json()
                 else:
-                    st.error("Failed to fetch evaluation report from backend.")
+                    try:
+                        err_detail = res.json().get("detail", res.text)
+                    except Exception:
+                        err_detail = res.text
+                    st.error(f"Failed to fetch evaluation report from backend: {err_detail}")
             except Exception as e:
                 st.error(f"Error fetching evaluation: {str(e)}")
                 
@@ -463,6 +408,22 @@ elif st.session_state.interview_completed:
             </div>
             """, unsafe_allow_html=True)
             
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # Display an interactive bar chart of the scores
+        import pandas as pd
+        scores_df = pd.DataFrame({
+            "Score": [
+                report["technical_score"],
+                report["communication_score"],
+                report["relevance_score"],
+                report["overall_score"]
+            ]
+        }, index=["Technical Accuracy", "Communication", "Role Relevance", "Overall Rating"])
+        
+        st.markdown("### 📊 Performance Breakdown")
+        st.bar_chart(scores_df, horizontal=True, color="#6366F1")
+        
         st.markdown("<br>", unsafe_allow_html=True)
         
         # Layout columns for strengths, weaknesses, and charts

@@ -17,3 +17,8 @@ data/
 
 # macOS files
 .DS_Store
+
+# Scratch & Temp Files
+scratch/
+test_resume.pdf
+generate_resume.py

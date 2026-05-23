@@ -42,6 +42,58 @@ class RAGCore:
             
         return cleaned_text
 
+    def extract_text(self, file_path: str) -> str:
+        """Route parsing based on file extension (PDF, DOCX, TXT)."""
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found at {file_path}")
+            
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext == ".pdf":
+            return self.extract_text_from_pdf(file_path)
+        elif ext == ".docx":
+            return self.extract_text_from_docx(file_path)
+        elif ext in [".txt", ".md"]:
+            return self.extract_text_from_txt(file_path)
+        else:
+            raise ValueError(f"Unsupported file format: {ext}. Only PDF, DOCX, and TXT are supported.")
+
+    def extract_text_from_docx(self, docx_path: str) -> str:
+        """Extract text from a DOCX file using built-in zipfile parser to avoid external dependencies."""
+        import zipfile
+        import xml.etree.ElementTree as ET
+        
+        try:
+            with zipfile.ZipFile(docx_path) as docx:
+                tree = ET.fromstring(docx.read('word/document.xml'))
+                paragraphs = []
+                for paragraph in tree.iter('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p'):
+                    texts = [node.text for node in paragraph.iter('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t') if node.text]
+                    if texts:
+                        paragraphs.append(''.join(texts))
+                text = '\n'.join(paragraphs)
+        except Exception as e:
+            raise ValueError(f"Failed to read DOCX file: {str(e)}")
+            
+        cleaned_text = self.clean_text(text)
+        if not cleaned_text or len(cleaned_text.strip()) < 50:
+            raise ValueError("Extracted DOCX text is empty or too short. Please upload a valid document.")
+            
+        return cleaned_text
+
+    def extract_text_from_txt(self, txt_path: str) -> str:
+        """Extract text from a plain text file."""
+        try:
+            with open(txt_path, "r", encoding="utf-8", errors="ignore") as f:
+                text = f.read()
+        except Exception as e:
+            raise ValueError(f"Failed to read TXT file: {str(e)}")
+            
+        cleaned_text = self.clean_text(text)
+        if not cleaned_text or len(cleaned_text.strip()) < 50:
+            raise ValueError("Extracted TXT text is empty or too short. Please upload a valid document.")
+            
+        return cleaned_text
+
     def clean_text(self, text: str) -> str:
         """Remove special characters, multiple newlines, and excess whitespace."""
         # Replace non-printable characters or weird symbols

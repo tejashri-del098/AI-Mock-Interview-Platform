@@ -76,14 +76,15 @@ def health_check():
 
 @app.post("/upload-resume")
 async def upload_resume(file: UploadFile = File(...)):
-    """Upload a PDF resume, extract text, split it, and index it into ChromaDB."""
-    if not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+    """Upload a resume (PDF, DOCX, TXT), extract text, split it, and index it into ChromaDB."""
+    filename_lower = file.filename.lower()
+    if not (filename_lower.endswith('.pdf') or filename_lower.endswith('.docx') or filename_lower.endswith('.txt') or filename_lower.endswith('.md')):
+        raise HTTPException(status_code=400, detail="Only PDF, DOCX, and TXT files are supported.")
         
     session_id = str(uuid.uuid4())
     file_path = os.path.join(UPLOAD_DIR, f"{session_id}_{file.filename}")
     
-    # Save PDF locally
+    # Save file locally
     try:
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
@@ -92,11 +93,10 @@ async def upload_resume(file: UploadFile = File(...)):
         
     # Extract, clean and index text
     try:
-        raw_text = rag.extract_text_from_pdf(file_path)
+        raw_text = rag.extract_text(file_path)
         chunks = rag.split_text(raw_text, chunk_size=500, chunk_overlap=50)
         rag.store_in_chroma(session_id=session_id, chunks=chunks)
     except ValueError as ve:
-        # Catch scanned/empty PDF error
         if os.path.exists(file_path):
             os.remove(file_path)
         raise HTTPException(status_code=400, detail=str(ve))
@@ -129,9 +129,23 @@ Resume Text:
             system_prompt="You are a JSON resume parser.",
             temperature=0.1
         )
-        
-        skills = res["data"].get("skills", [])
-        projects = res["data"].get("projects", [])
+        data = res["data"]
+        skills = []
+        projects = []
+        if isinstance(data, dict):
+            skills = data.get("skills", [])
+            projects = data.get("projects", [])
+        elif isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict):
+                    if "skills" in item and isinstance(item["skills"], list):
+                        skills.extend(item["skills"])
+                    elif "skill" in item:
+                        skills.append(item["skill"])
+                    if "projects" in item and isinstance(item["projects"], list):
+                        projects.extend(item["projects"])
+                    elif "project" in item:
+                        projects.append(item["project"])
         
         # Classify the engineering role
         role = interviewer.classify_role(skills, projects)
@@ -174,7 +188,7 @@ async def start_interview(request: StartInterviewRequest):
         
         # Convert first question to speech
         audio_filename = f"{request.session_id}_turn_0.mp3"
-        audio_path = text_to_speech(first_q, audio_filename)
+        audio_path = await text_to_speech(first_q, audio_filename)
         audio_url = f"/static/audio/{audio_filename}"
         
         return {
@@ -216,7 +230,7 @@ async def generate_question(request: GenerateQuestionRequest):
         # Don't speak the completion message
         if not completed or "complete" not in next_q.lower():
             audio_filename = f"{request.session_id}_turn_{turn_idx}.mp3"
-            text_to_speech(next_q, audio_filename)
+            await text_to_speech(next_q, audio_filename)
             audio_url = f"/static/audio/{audio_filename}"
             
         return {

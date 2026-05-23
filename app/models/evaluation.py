@@ -1,5 +1,7 @@
 import os
 import json
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from fpdf import FPDF
@@ -80,7 +82,7 @@ Provide a strict, professional evaluation in JSON format containing:
 - `relevance_score`: Integer (1-100)
 - `strengths`: List of 3 strings (specific positive points about their responses)
 - `improvements`: List of 3 strings (specific constructive feedback points)
-- `ideal_answers`: Object mapping each of the Interviewer's questions to the "Ideal Answer" that the candidate should have given.
+- `ideal_answers`: Object mapping each of the Interviewer's questions to a concise "Ideal Answer" (maximum 2 sentences).
 - `study_topics`: List of 3 key topics/skills the candidate should study based on their gaps.
 
 Example JSON output structure:
@@ -100,8 +102,9 @@ Example JSON output structure:
 
         res = self.llm.generate_json(
             prompt=prompt,
-            system_prompt="You are a JSON evaluator. Rate candidates honestly and keep temperature low (0.2).",
-            temperature=0.1
+            system_prompt="You are a JSON evaluator. Rate candidates honestly, keep ideal answers concise, and keep temperature low (0.2).",
+            temperature=0.1,
+            max_tokens=4000
         )
         
         eval_data = res["data"]

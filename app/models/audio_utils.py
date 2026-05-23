@@ -26,8 +26,8 @@ class WhisperManager:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Audio file not found at {file_path}")
             
-        # Check if file is essentially empty (less than 4KB)
-        if os.path.getsize(file_path) < 4096:
+        # Check if file is essentially empty (less than 100 bytes)
+        if os.path.getsize(file_path) < 100:
             return ""
             
         try:
@@ -40,23 +40,10 @@ class WhisperManager:
             return ""
 
 
-async def text_to_speech_async(text: str, output_path: str, voice: str = "en-US-BrianNeural"):
-    """Convert text to speech asynchronously using edge-tts."""
-    communicate = edge_tts.Communicate(text, voice)
-    await communicate.save(output_path)
-
-
-def text_to_speech(text: str, filename: str, voice: str = "en-US-BrianNeural") -> str:
-    """Synchronous wrapper for Edge TTS. Returns the absolute file path to the generated audio."""
+async def text_to_speech(text: str, filename: str, voice: str = "en-US-BrianNeural") -> str:
+    """Convert text to speech asynchronously using edge-tts. Returns the absolute file path to the generated audio."""
     os.makedirs(AUDIO_DIR, exist_ok=True)
     output_path = os.path.join(AUDIO_DIR, filename)
-    
-    # Run async function in a sync environment
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        loop.run_until_complete(text_to_speech_async(text, output_path, voice))
-    finally:
-        loop.close()
-        
+    communicate = edge_tts.Communicate(text, voice)
+    await communicate.save(output_path)
     return output_path
