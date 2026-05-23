@@ -1,3 +1,13 @@
+---
+title: AI Mock Interview Platform
+emoji: 💼
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # AI Mock Interview Platform
 
 A state-of-the-art, privacy-centric, local RAG-powered, and speech-enabled technical recruiter preparation platform. This application parses a candidate's resume (PDF, DOCX, or TXT), embeds and indexes it in a local vector database, conducts an interactive technical mock interview with natural text-to-speech voice generation and local Whisper speech-to-text recognition, and compiles a comprehensive performance dashboard complete with interactive score charts, ideal responses, and a downloadable PDF certificate report.
