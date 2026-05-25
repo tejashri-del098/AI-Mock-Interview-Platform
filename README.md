@@ -125,6 +125,28 @@ We adopted a structured, phase-based engineering workflow to build the platform 
 
 ---
 
+## 🔌 APIs / Models / Tools Used
+
+| Category | Name | Purpose |
+|---|---|---|
+| **LLM API** | Google Gemini API (`gemini-2.5-flash`) | Primary recruiter engine for question generation, skills extraction, and candidate evaluation |
+| **LLM API (Fallback)** | Groq API (`llama-3.3-70b-versatile`) | Automatic fallback when Gemini hits rate limits (429 errors) |
+| **Embedding Model** | HuggingFace `all-MiniLM-L6-v2` | Local sentence-transformer for converting resume chunks into vector embeddings |
+| **Speech-to-Text Model** | OpenAI Whisper (`tiny`) | Local audio transcription — runs offline, no API calls |
+| **Text-to-Speech** | Microsoft Edge TTS (`edge-tts`) | Converts recruiter questions into natural spoken audio |
+| **Vector Database** | ChromaDB | Local persistent vector store for resume chunk indexing and similarity search |
+| **Web Framework** | FastAPI + Uvicorn | Async REST API backend serving all endpoints |
+| **UI Framework** | Streamlit | Interactive dashboard frontend with chat interface |
+| **PDF Parser** | PyMuPDF (`fitz`) + `pypdf` | Multi-library resume text extraction with fallback |
+| **DOCX Parser** | Python `zipfile` + `xml.etree` | Native Word document parsing without external dependencies |
+| **PDF Generator** | `fpdf2` + Matplotlib | Feedback report compilation with embedded score charts |
+| **Text Splitter** | LangChain `RecursiveCharacterTextSplitter` | Chunking resume text (500 chars, 50 overlap) for RAG indexing |
+| **Database** | SQLite3 | Persisting session data, user profiles, and chat history |
+| **Deployment** | Docker + Nginx + Supervisord | Containerized multi-service deployment on Hugging Face Spaces |
+| **CI/CD** | GitHub Actions | Auto-deploy to Hugging Face on every push to `main` |
+
+---
+
 ## 🚀 Setup Instructions & Installation
 
 ### 📋 Prerequisites
@@ -142,7 +164,7 @@ brew install ffmpeg
 
 Clone the repository and navigate to the project directory:
 ```bash
-git clone <repository-url>
+git clone https://github.com/tejashri-del098/AI-Mock-Interview-Platform.git
 cd AI_Mock_Interview
 ```
 
@@ -221,3 +243,16 @@ To run a text-based simulation in your terminal window (no browser required):
 source env/bin/activate
 python3 cli_test.py
 ```
+
+---
+
+## 📸 Screenshots
+
+| Screen | Description |
+|---|---|
+| **Landing Page** | Dark-themed Streamlit dashboard with sidebar configuration for role, difficulty, and question count |
+| **Resume Upload** | Multi-format file uploader (PDF/DOCX/TXT) with extracted skills display |
+| **Interview Chat** | Real-time chat interface with AI recruiter questions and TTS audio playback |
+| **Voice Recorder** | Custom HTML5 mic recorder with live canvas waveform visualization |
+| **Score Dashboard** | Interactive bar chart showing Technical Accuracy, Communication, Role Relevance scores |
+| **PDF Report** | Downloadable feedback certificate with score breakdowns, ideal answers, and improvement areas |
