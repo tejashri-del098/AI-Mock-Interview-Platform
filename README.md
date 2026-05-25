@@ -30,7 +30,7 @@ This project solves these issues by establishing a **RAG-powered conversational 
 ## 🎥 Demo Video & Deployed Link
 🚀 **[Live Deployed Space on Hugging Face](https://huggingface.co/spaces/tejashrichoudhary2/AI-Mock-Interview-Platform)**
 
-📺 **[Watch the Live Demo Video on YouTube/Google Drive](https://www.youtube.com/)** *(Replace this link with your actual demo url)*
+📺 **[Watch the Live Demo Video](https://drive.google.com/file/d/1r5J4Rtxl5PWh93LGRgnxsFiENkeQTNrZ/view?usp=sharing)**
 
 ---
 
